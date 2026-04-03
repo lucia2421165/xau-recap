@@ -72,6 +72,8 @@ header{display:flex;align-items:flex-start;justify-content:space-between;margin-
 .day-cell.done .check svg{display:block;}
 .day-note{font-size:9px;color:rgba(232,242,250,.5);font-family:'Space Mono',monospace;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
 .day-cell:not(.done) .day-note{color:var(--muted);}
+.day-cell.holiday{opacity:.5;cursor:default;}
+.holiday-label{font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;letter-spacing:.05em;}
 .legend{display:flex;gap:20px;margin-top:1rem;padding:0 2px;}
 .legend-item{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;}
 .legend-dot{width:10px;height:10px;border-radius:2px;}
@@ -101,6 +103,9 @@ header{display:flex;align-items:flex-start;justify-content:space-between;margin-
 .toast.show{opacity:1;transform:translateY(0);}
 .btn-reset{background:none;border:1px solid var(--border);border-radius:var(--r);padding:5px 12px;font-size:10px;font-family:'Space Mono',monospace;color:var(--muted);cursor:pointer;letter-spacing:.05em;transition:.12s;}
 .btn-reset:hover{border-color:#cc0000;color:#cc0000;}
+.month-jump{display:flex;align-items:center;gap:6px;}
+.jump-select{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:4px 8px;font-size:11px;font-family:'Space Mono',monospace;color:var(--text);cursor:pointer;outline:none;transition:.12s;}
+.jump-select:focus{border-color:var(--ink);}
 .confirm-bar{display:none;align-items:center;gap:10px;padding:10px 14px;background:#1E1520;border:1px solid #5A2030;border-radius:var(--r);margin-bottom:1rem;font-size:11px;font-family:'Space Mono',monospace;color:#cc0000;}
 .confirm-bar.show{display:flex;}
 .confirm-bar button{background:none;border:1px solid currentColor;border-radius:var(--r);padding:4px 10px;font-size:10px;font-family:'Space Mono',monospace;cursor:pointer;transition:.12s;}
@@ -161,7 +166,10 @@ header{display:flex;align-items:flex-start;justify-content:space-between;margin-
     <button class="confirm-no" onclick="cancelReset()">Cancelar</button>
   </div>
   <div class="month-nav">
-    <div class="month-name" id="monthName"></div>
+    <div class="month-jump">
+      <select class="jump-select" id="jumpMonth" onchange="jumpTo()"></select>
+      <select class="jump-select" id="jumpYear" onchange="jumpTo()"></select>
+    </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <button class="btn-reset" onclick="askReset()">Borrar todo</button>
       <div class="nav-btns">
@@ -187,6 +195,7 @@ header{display:flex;align-items:flex-start;justify-content:space-between;margin-
     <div class="legend-item"><div class="legend-dot" style="background:#4A7FA5;"></div>Recap hecho</div>
     <div class="legend-item"><div class="legend-dot" style="background:#1C2030;border:1px solid #2A2E3A;"></div>Sin recap</div>
     <div class="legend-item"><div class="legend-dot" style="border-top:2px solid #4A7FA5;background:none;border-radius:0;height:2px;width:16px;margin-top:4px;"></div>Hoy</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--bg2);border:1px solid var(--border);opacity:.5;"></div>Festivo</div>
   </div>
 </div>
 
@@ -282,6 +291,40 @@ function isToday(y, m, d)  { const t = today(); return t.getFullYear()===y && t.
 function isWeekend(dt)     { return dt.getDay()===0 || dt.getDay()===6; }
 function prevDay(dt)       { const d=new Date(dt); d.setDate(d.getDate()-1); return d; }
 
+// ── Festivos Colombia ────────────────────────────────────────────────────────
+function buildHolidays(y) {
+  const h = new Set();
+  const add = (m,d) => h.add(`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  const addDt = dt => h.add(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`);
+  const nextMon = dt => { const d=new Date(dt); const dw=d.getDay(); if(dw===1) return d; d.setDate(d.getDate()+((1-dw+7)%7||7)); return d; };
+  const a=y%19,b=Math.floor(y/100),c=y%100,d0=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3),h0=(19*a+b-d0-g+15)%30,i=Math.floor(c/4),k=c%4;
+  const l=(32+2*e+2*i-h0-k)%7,m0=Math.floor((a+11*h0+22*l)/451);
+  const em=Math.floor((h0+l-7*m0+114)/31),ed=((h0+l-7*m0+114)%31)+1;
+  const easter=new Date(y,em-1,ed);
+  const ep=n=>{const d=new Date(easter);d.setDate(d.getDate()+n);return d;};
+  // Colombia
+  add(1,1); addDt(nextMon(new Date(y,0,6))); addDt(nextMon(new Date(y,2,19)));
+  addDt(ep(-3)); addDt(ep(-2)); add(5,1);
+  addDt(nextMon(ep(39))); addDt(nextMon(ep(60))); addDt(nextMon(ep(68)));
+  addDt(nextMon(new Date(y,5,29))); add(7,20); add(8,7);
+  addDt(nextMon(new Date(y,7,15))); addDt(nextMon(new Date(y,9,12)));
+  addDt(nextMon(new Date(y,10,1))); addDt(nextMon(new Date(y,10,11)));
+  add(12,8); add(12,25);
+  // USA
+  const nth=(mn,dw,n)=>{const d=new Date(y,mn,1);d.setDate(1+(dw-d.getDay()+7)%7+(n-1)*7);return d;};
+  const last=(mn,dw)=>{const d=new Date(y,mn+1,0);d.setDate(d.getDate()-(d.getDay()-dw+7)%7);return d;};
+  add(1,1); addDt(nth(0,1,3)); addDt(nth(1,1,3)); addDt(last(4,1));
+  add(6,19); add(7,4); addDt(nth(8,1,1)); addDt(nth(9,1,2));
+  add(11,11); addDt(nth(10,4,4)); add(12,25);
+  return h;
+}
+const _hCache = {};
+function isHoliday(y,m,d) {
+  if(!_hCache[y]) _hCache[y]=buildHolidays(y);
+  return _hCache[y].has(dateKey(y,m,d));
+}
+
 // ── Racha ─────────────────────────────────────────────────────────────────────
 function calcStreak() {
   // 1. Buscar hacia atrás el día hábil más reciente con recap=true
@@ -311,7 +354,7 @@ function updateStats() {
   let total=0, done=0;
   for (let d=1; d<=days; d++) {
     const dow = new Date(viewYear, viewMonth, d).getDay();
-    if (dow>=1 && dow<=5 && !isFuture(viewYear, viewMonth, d)) {
+    if (dow>=1 && dow<=5 && !isFuture(viewYear, viewMonth, d) && !isHoliday(viewYear, viewMonth, d)) {
       total++;
       if (data[dateKey(viewYear, viewMonth, d)]?.recap===true) done++;
     }
@@ -346,7 +389,18 @@ function getWeeks(y, m) {
 
 // ── Render calendario ─────────────────────────────────────────────────────────
 function render() {
-  document.getElementById('monthName').textContent = `${MONTHS[viewMonth]} ${viewYear}`;
+  // Sync jump selects
+  const jm = document.getElementById('jumpMonth');
+  const jy = document.getElementById('jumpYear');
+  if (jm.options.length === 0) {
+    MONTHS.forEach((m,i) => { const o=document.createElement('option'); o.value=i; o.textContent=m; jm.appendChild(o); });
+  }
+  if (jy.options.length === 0) {
+    const cy = new Date().getFullYear();
+    for (let y=cy-3; y<=cy+1; y++) { const o=document.createElement('option'); o.value=y; o.textContent=y; jy.appendChild(o); }
+  }
+  jm.value = viewMonth;
+  jy.value = viewYear;
   const body = document.getElementById('calBody');
   body.innerHTML = '';
 
@@ -363,17 +417,19 @@ function render() {
       const cell = document.createElement('div');
       if (d===null) { cell.className='day-cell empty'; row.appendChild(cell); return; }
 
-      const k       = dateKey(viewYear, viewMonth, d);
-      const entry   = data[k];
-      const future  = isFuture(viewYear, viewMonth, d);
-      const tod     = isToday(viewYear, viewMonth, d);
+      const k        = dateKey(viewYear, viewMonth, d);
+      const entry    = data[k];
+      const future   = isFuture(viewYear, viewMonth, d);
+      const tod      = isToday(viewYear, viewMonth, d);
       const hasRecap = entry?.recap === true;
+      const holiday  = isHoliday(viewYear, viewMonth, d);
 
       let cls = 'day-cell';
       if (i===0)    cls += ' first';
       if (future)   cls += ' future';
       if (hasRecap) cls += ' done';
       if (tod)      cls += ' today';
+      if (holiday)  cls += ' holiday';
       cell.className = cls;
 
       // Número
@@ -382,21 +438,28 @@ function render() {
       num.textContent = d;
       cell.appendChild(num);
 
-      // Check
-      const chk = document.createElement('div');
-      chk.className = 'check';
-      chk.innerHTML = '<svg viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,2.5"/></svg>';
-      cell.appendChild(chk);
+      if (holiday) {
+        const hl = document.createElement('div');
+        hl.className = 'holiday-label';
+        hl.textContent = 'festivo';
+        cell.appendChild(hl);
+      } else {
+        // Check
+        const chk = document.createElement('div');
+        chk.className = 'check';
+        chk.innerHTML = '<svg viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,2.5"/></svg>';
+        cell.appendChild(chk);
 
-      // Nota
-      if (entry?.note) {
-        const n = document.createElement('div');
-        n.className = 'day-note';
-        n.textContent = entry.note;
-        cell.appendChild(n);
+        // Nota
+        if (entry?.note) {
+          const n = document.createElement('div');
+          n.className = 'day-note';
+          n.textContent = entry.note;
+          cell.appendChild(n);
+        }
       }
 
-      if (!future) cell.onclick = () => openModal(d, viewMonth, viewYear, k);
+      if (!future && !holiday) cell.onclick = () => openModal(d, viewMonth, viewYear, k);
       row.appendChild(cell);
     });
 
@@ -414,6 +477,13 @@ function changeMonth(dir) {
   render();
 }
 window.changeMonth = changeMonth;
+
+function jumpTo() {
+  viewMonth = parseInt(document.getElementById('jumpMonth').value);
+  viewYear  = parseInt(document.getElementById('jumpYear').value);
+  render();
+}
+window.jumpTo = jumpTo;
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 function openModal(d, m, y, k) {
